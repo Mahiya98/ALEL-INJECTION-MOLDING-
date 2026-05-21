@@ -161,6 +161,8 @@ function renderKPIs(rows){
 }
 
 
+
+
 /* ---------- Charts ---------- */
 function destroyCharts(){ Object.values(charts).forEach(c=>c?.destroy()); charts={}; }
 function renderCharts(rows){
