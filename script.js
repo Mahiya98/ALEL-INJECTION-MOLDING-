@@ -142,14 +142,24 @@ function renderKPIs(rows){
     const sum  = vals.reduce((a,b)=>a+b,0);
     const avg  = vals.length ? sum/vals.length : 0;
     const suffix = c.type==="pct" ? "%" : "";
+
+    // Headline number: avg for percentages, sum for counts
+    const headline = c.type==="pct" ? fmt(avg,2)+suffix : fmt(sum,0);
+
+    // Sub-line: hide entirely for percentages, show Avg for counts
+    const subline = c.type==="pct"
+      ? ""                                   // 🚫 no Sum on percentage cards
+      : `<div class="avg">Avg: ${fmt(avg,2)}</div>`;
+
     wrap.insertAdjacentHTML("beforeend",`
       <div class="kpi ${c.color}">
         <h4>${c.label} <span style="opacity:.5">[${c.key}]</span></h4>
-        <div class="total">${c.type==="pct"?fmt(avg,2)+suffix:fmt(sum,0)}</div>
-        <div class="avg">${c.type==="pct"?`Sum: ${fmt(sum,1)}${suffix}`:`Avg: ${fmt(avg,2)}`}</div>
+        <div class="total">${headline}</div>
+        ${subline}
       </div>`);
   });
 }
+
 
 /* ---------- Charts ---------- */
 function destroyCharts(){ Object.values(charts).forEach(c=>c?.destroy()); charts={}; }
