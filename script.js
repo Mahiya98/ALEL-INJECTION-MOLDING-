@@ -4,7 +4,7 @@
    ============================================================ */
 const SHEET_ID = "1687hf4iPefPAw_5Jx55Y_kN20ebDi6s131p3ajGc2ow";
 const GID      = "78827421";
-const CSV_URL  = `https://docs.google.com/spreadsheets/d/e/2PACX-1vT278Z7eDyGDEydyjtAkK0xGD0Y9y5GmAw8DJcFsLyX1agdEE-UD7hQdEZZvsmkU68CuK0BOfvZi1vk/pub?gid=78827421&single=true&output=csv`;
+const CSV_URL  = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${GID}`;
 
 /* Column index map (0-based)
    B=1 Date | D=3 Shift
@@ -12,6 +12,7 @@ const CSV_URL  = `https://docs.google.com/spreadsheets/d/e/2PACX-1vT278Z7eDyGDEy
    L=11 % Achievement    | AB=27 NPT%        | AE=30 Wastage%
    AH=33 % Availability  | AI=34 Performance%| AJ=35 Quality%
    AK=36 OEE%
+   IGNORE: AM=38, AN=39
 */
 const KPI_COLS = [
   {idx:7,  key:"H",  label:"Shift Capacity (Pcs)", type:"num", color:"blue"},
@@ -36,6 +37,11 @@ const ANALYSIS_COLS = {
   TotalWastage:29, WastageReason:31, GoodProduction:32, Remarks:37
 };
 
+/* Columns to ignore in the data table */
+const IGNORE_COLS = [38, 39]; // AM, AN
+
+/* Original sheet headers will be captured from row 1 */
+let HEADERS = [];
 let RAW = [];
 let charts = {};
 
@@ -49,7 +55,7 @@ const toNum = v => {
 const fmt = (n,d=2) => Number(n||0).toLocaleString(undefined,{maximumFractionDigits:d});
 const parseDate = s => {
   if(!s) return null;
-  const p = s.split("/");
+  const p = String(s).split("/");
   if(p.length===3){
     const [m,d,y] = p.map(Number);
     return new Date(y, m-1, d);
@@ -63,13 +69,13 @@ async function loadData(){
   const res  = await fetch(CSV_URL+"&_="+Date.now());
   const text = await res.text();
   const parsed = Papa.parse(text,{header:false}).data;
-  // Skip header (row 1)
+  HEADERS = parsed[0] || [];
   RAW = parsed.slice(1).filter(r => r && r[1]); // need a Date in B
   buildFilters();
   applyFilters();
 }
 
-/* ---------- Filters ---------- */
+/* ---------- Filters (only Month, Date, Shift) ---------- */
 function buildFilters(){
   const months = new Set(), dates = new Set(), shifts = new Set();
   RAW.forEach(r=>{
@@ -77,31 +83,29 @@ function buildFilters(){
     if(d){ months.add(monthName(d)); dates.add(r[1]); }
     if(r[3]) shifts.add(r[3]);
   });
+
+  // reset selects (keep only the "All" option)
+  resetSelect("monthFilter");
+  resetSelect("dateFilter");
+  resetSelect("shiftFilter");
+
   fillSelect("monthFilter",[...months]);
-  fillSelect("dateFilter",[...dates]);
+  // sort dates chronologically
+  fillSelect("dateFilter",[...dates].sort((a,b)=>parseDate(a)-parseDate(b)));
   fillSelect("shiftFilter",[...shifts]);
 
-  /* Extra filters: Section, Machine, Supervisor */
+  // remove any extra filter cards if they exist (cleanup)
   const extra = document.getElementById("extraFilters");
-  extra.innerHTML = "";
-  [
-    ["sectionFilter","🏭 Section",ANALYSIS_COLS.Section],
-    ["machineFilter","🛠️ Machine",ANALYSIS_COLS.Machine],
-    ["supervisorFilter","👤 Supervisor",ANALYSIS_COLS.Supervisor]
-  ].forEach(([id,label,colIdx])=>{
-    const vals = [...new Set(RAW.map(r=>r[colIdx]).filter(Boolean))];
-    extra.insertAdjacentHTML("beforeend",`
-      <div class="filter-group">
-        <label>${label}</label>
-        <select id="${id}"><option value="ALL">All</option>
-          ${vals.map(v=>`<option>${v}</option>`).join("")}
-        </select>
-      </div>`);
-    document.getElementById(id).addEventListener("change",applyFilters);
-  });
+  if(extra) extra.innerHTML = "";
 
-  ["monthFilter","dateFilter","shiftFilter"].forEach(id=>
-    document.getElementById(id).addEventListener("change",applyFilters));
+  ["monthFilter","dateFilter","shiftFilter"].forEach(id=>{
+    const el = document.getElementById(id);
+    el.onchange = applyFilters; // single handler, prevents duplicates
+  });
+}
+function resetSelect(id){
+  const sel = document.getElementById(id);
+  sel.innerHTML = `<option value="ALL">All</option>`;
 }
 function fillSelect(id,vals){
   const sel = document.getElementById(id);
@@ -115,18 +119,12 @@ function applyFilters(){
   const month = document.getElementById("monthFilter").value;
   const date  = document.getElementById("dateFilter").value;
   const shift = document.getElementById("shiftFilter").value;
-  const sec   = document.getElementById("sectionFilter")?.value||"ALL";
-  const mac   = document.getElementById("machineFilter")?.value||"ALL";
-  const sup   = document.getElementById("supervisorFilter")?.value||"ALL";
 
   const filtered = RAW.filter(r=>{
     const d = parseDate(r[1]);
     if(month!=="ALL" && monthName(d)!==month) return false;
     if(date !=="ALL" && r[1]!==date) return false;
     if(shift!=="ALL" && r[3]!==shift) return false;
-    if(sec  !=="ALL" && r[ANALYSIS_COLS.Section]!==sec) return false;
-    if(mac  !=="ALL" && r[ANALYSIS_COLS.Machine]!==mac) return false;
-    if(sup  !=="ALL" && r[ANALYSIS_COLS.Supervisor]!==sup) return false;
     return true;
   });
 
@@ -244,14 +242,23 @@ function chartOpts(){
     }};
 }
 
-/* ---------- Data Table ---------- */
+/* ---------- Data Table (ALL columns except AM & AN) ---------- */
 function renderTable(rows){
-  const headers = ["SBU","Date","Section","Shift","Machine","Product","Supervisor",
-    "ShiftCap","Target","Output","%Ach","NPT%","Waste%","Avail%","Perf%","Qual%","OEE%"];
-  const idxs = [0,1,2,3,4,5,6,7,8,9,11,27,30,33,34,35,36];
+  // build list of columns to show: every header index except IGNORE_COLS
+  const totalCols = HEADERS.length || (rows[0] ? rows[0].length : 0);
+  const visibleIdx = [];
+  for(let i=0;i<totalCols;i++){
+    if(!IGNORE_COLS.includes(i)) visibleIdx.push(i);
+  }
+
   const t = document.getElementById("dataTable");
-  t.innerHTML = "<thead><tr>"+headers.map(h=>`<th>${h}</th>`).join("")+"</tr></thead>"+
-    "<tbody>"+rows.map(r=>"<tr>"+idxs.map(i=>`<td>${r[i]||""}</td>`).join("")+"</tr>").join("")+"</tbody>";
+  const headHtml = "<thead><tr>" +
+    visibleIdx.map(i=>`<th>${(HEADERS[i]||"Col "+(i+1))}</th>`).join("") +
+    "</tr></thead>";
+  const bodyHtml = "<tbody>" +
+    rows.map(r=>"<tr>"+visibleIdx.map(i=>`<td>${r[i]??""}</td>`).join("")+"</tr>").join("") +
+    "</tbody>";
+  t.innerHTML = headHtml + bodyHtml;
 }
 
 /* ---------- Init ---------- */
