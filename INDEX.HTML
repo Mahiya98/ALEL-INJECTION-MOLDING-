@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Injection Molding Dashboard</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">⚙️</span>
+      <div>
+        <h1>Injection Molding</h1>
+        <p>Production Performance Dashboard</p>
+      </div>
+    </div>
+    <button id="refreshBtn" class="btn">🔄 Refresh</button>
+  </header>
+
+  <section class="filters">
+    <div class="filter-group">
+      <label>📅 Month</label>
+      <select id="monthFilter"><option value="ALL">All</option></select>
+    </div>
+    <div class="filter-group">
+      <label>🗓️ Date</label>
+      <select id="dateFilter"><option value="ALL">All</option></select>
+    </div>
+    <div class="filter-group">
+      <label>🌗 Shift</label>
+      <select id="shiftFilter"><option value="ALL">All</option></select>
+    </div>
+    <div class="filter-group" id="extraFilters"></div>
+  </section>
+
+  <section id="kpiCards" class="kpi-grid"></section>
+
+  <section class="chart-grid">
+    <div class="card chart-card">
+      <h3>Output vs Target Trend</h3>
+      <canvas id="trendChart"></canvas>
+    </div>
+    <div class="card chart-card">
+      <h3>OEE Components</h3>
+      <canvas id="oeeChart"></canvas>
+    </div>
+    <div class="card chart-card">
+      <h3>Downtime Breakdown (Mins)</h3>
+      <canvas id="downtimeChart"></canvas>
+    </div>
+    <div class="card chart-card">
+      <h3>Wastage by Reason</h3>
+      <canvas id="wastageChart"></canvas>
+    </div>
+    <div class="card chart-card wide">
+      <h3>Production by Supervisor</h3>
+      <canvas id="supervisorChart"></canvas>
+    </div>
+    <div class="card chart-card wide">
+      <h3>Production by Machine</h3>
+      <canvas id="machineChart"></canvas>
+    </div>
+  </section>
+
+  <section class="card">
+    <h3>📋 Data Table (filtered)</h3>
+    <div class="table-wrap">
+      <table id="dataTable"></table>
+    </div>
+  </section>
+
+  <footer><p>Data source: Google Sheets · Auto-refresh every 5 min</p></footer>
+  <script src="script.js"></script>
+</body>
+</html>
